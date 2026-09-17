@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Diff Checker — compare two texts and see what actually changed</title>
+<meta name="description" content="Compare two blocks of text and see exactly which lines and words differ, with CRLF vs LF, trailing whitespace, tab/space swaps and confusable characters called out. Runs in your browser; nothing is uploaded.">
+<meta name="robots" content="index,follow">
+<style>
+:root{--ink:#16191d;--ink2:#3d444d;--ink3:#6a7280;--line:#e3e6ea;--line2:#eef0f3;--bg:#fff;--soft:#f7f8fa;
+--accent:#1a56db;--accent-soft:#eef2ff;--ok:#0f7b4a;--ok-soft:#eaf6f0;--warn:#8a5a00;--warn-soft:#fdf5e3;
+--bad:#a3271f;--bad-soft:#fdeceb;--r:8px;
+--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:0 20px}
+h1{font-size:26px;line-height:1.25;letter-spacing:-.02em;margin:26px 0 6px}
+h2{font-size:18px;margin:32px 0 10px;padding-top:10px;border-top:1px solid var(--line2)}
+h3{font-size:15px;margin:20px 0 6px}
+p{margin:0 0 12px}
+a{color:var(--accent)}
+ul{margin:0 0 12px;padding-left:20px}
+li{margin:0 0 6px}
+code{font-family:var(--mono);font-size:.86em;background:var(--soft);border:1px solid var(--line2);
+border-radius:4px;padding:1px 5px;word-break:break-all}
+.small{font-size:13.5px;color:var(--ink3)}
+.lede{font-size:16.5px;color:var(--ink2);margin:0 0 6px}
+header.top{border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:baseline;gap:12px;padding-top:14px;padding-bottom:14px}
+.brand{font-weight:700;font-size:17px;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
+.badge{font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:2px 7px}
+.card{border:1px solid var(--line);border-radius:var(--r);padding:18px;margin:18px 0;background:var(--bg)}
+.step{display:flex;gap:10px;align-items:baseline;margin:0 0 8px}
+.step .n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;
+font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.step .t{font-weight:600;font-size:15px}
+textarea{width:100%;min-height:148px;font-family:var(--mono);font-size:13px;line-height:1.55;
+border:1px solid var(--line);border-radius:var(--r);padding:10px;resize:vertical;background:var(--bg);color:var(--ink);
+white-space:pre;overflow-wrap:normal;overflow-x:auto}
+textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.opts{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:12px 0 0}
+.opts label{display:flex;align-items:center;gap:6px;font-size:14.5px;cursor:pointer}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:var(--bg);
+color:var(--ink2);border-radius:6px;padding:6px 12px;cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#1648b8;color:#fff}
+.sums{display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;font-size:13.5px;padding:9px 12px;
+background:var(--soft);border-bottom:1px solid var(--line2)}
+.sums .sadd{color:var(--ok);font-weight:700}
+.sums .srm{color:var(--bad);font-weight:700}
+.sums .seq{color:var(--ink3)}
+.diffwrap{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;display:none}
+.diff{font-family:var(--mono);font-size:12.5px;line-height:1.6;overflow-x:auto;max-height:560px;overflow-y:auto}
+.row{display:flex;min-width:100%}
+.row .ln{flex:0 0 56px;text-align:right;padding:0 10px;color:var(--ink3);background:var(--soft);
+border-right:1px solid var(--line2);user-select:none;-webkit-user-select:none;white-space:nowrap}
+.row .tx{flex:1 1 auto;white-space:pre-wrap;word-break:break-word;padding:0 12px;min-width:0}
+.row.eq .tx{color:var(--ink3)}
+.row.del{background:var(--bad-soft)}
+.row.del .tx{color:var(--bad)}
+.row.del .ln{background:#f6dcd9;color:#8c2b23}
+.row.ins{background:var(--ok-soft)}
+.row.ins .tx{color:var(--ok)}
+.row.ins .ln{background:#d9efe3;color:#0b5c37}
+.chgdel{background:#f0c0bc;color:#6b1612;border-radius:3px;padding:0 1px}
+.chgins{background:#b1dfc6;color:#0b4d2e;border-radius:3px;padding:0 1px}
+.diag{margin:12px 0 0;padding:0;list-style:none;display:none}
+.diag li{border:1px solid var(--line);border-radius:var(--r);padding:10px 13px;margin:0 0 8px;font-size:14.5px}
+.diag li .h{font-weight:600;display:block;margin-bottom:2px}
+.diag li.hit{border-color:#f0e2bd;background:var(--warn-soft)}
+.diag li.info{border-color:var(--line);background:var(--soft)}
+.verdict{border-radius:var(--r);padding:13px 16px;margin:14px 0 0;border:1px solid var(--line);
+background:var(--soft);border-left:4px solid var(--ink3);font-size:15px;display:none}
+.verdict.ok{background:var(--ok-soft);border-color:#cfe8db;border-left-color:var(--ok);color:var(--ok)}
+.verdict.bad{background:var(--bad-soft);border-color:#f3d3d1;border-left-color:var(--bad);color:var(--bad)}
+.verdict.warn{background:var(--warn-soft);border-color:#f0e2bd;border-left-color:var(--warn);color:var(--warn)}
+.verdict b{display:block;font-size:16px;margin-bottom:2px}
+.note{background:var(--soft);border:1px solid var(--line);border-left:3px solid var(--ink3);
+border-radius:var(--r);padding:12px 16px;margin:0 0 14px;font-size:14.5px}
+footer.foot{margin-top:44px;border-top:1px solid var(--line);background:var(--soft);
+font-size:13px;color:var(--ink3)}
+footer.foot .wrap{padding:20px 20px 34px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="https://ifetchora.com/tools/text-diff-checker/">Text Diff Checker</a>
+    <span class="badge">v1.0.0</span>
+    <span class="small">Runs entirely in your browser &middot; nothing is uploaded</span>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+
+<h1>Text Diff Checker</h1>
+<p class="lede">Compare two blocks of text and see exactly which lines and words differ — including the invisible differences (CRLF vs LF, trailing spaces, tab/space swaps) that make a reformatted file look 100% changed.</p>
+
+<div class="card">
+
+  <div class="step"><span class="n">1</span><span class="t">Original text</span><span class="small" id="fileNoteA"></span><label class="btn" for="fa" style="margin-left:auto">Load file&hellip;</label><input type="file" id="fa" hidden></div>
+  <textarea id="ta" spellcheck="false" placeholder="paste the original text here — or load the file so its line endings can be checked"></textarea>
+
+  <div class="step" style="margin-top:16px"><span class="n">2</span><span class="t">Changed text</span><span class="small" id="fileNoteB"></span><label class="btn" for="fb" style="margin-left:auto">Load file&hellip;</label><input type="file" id="fb" hidden></div>
+  <textarea id="tb" spellcheck="false" placeholder="paste the new version — or load the file to compare the bytes as they are on disk"></textarea>
+
+  <div class="opts">
+    <label><input type="checkbox" id="igCase"> Ignore case</label>
+    <label><input type="checkbox" id="igWs"> Ignore whitespace</label>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" id="go" type="button">Compare</button>
+    <button class="btn" id="swap" type="button">Swap inputs</button>
+    <button class="btn" id="clear" type="button">Clear</button>
+    <span class="small" id="status"></span>
+  </div>
+
+  <div class="verdict" id="verdict"></div>
+  <div class="diffwrap" id="diffwrap">
+    <div class="sums" id="sums"></div>
+    <div class="diff" id="diff"></div>
+  </div>
+  <ul class="diag" id="diag"></ul>
+</div>
+
+<h2>What this does not prove</h2>
+<p>A <b>line-for-line match</b> proves that the two texts are byte-identical at the character level — nothing more. Several everyday situations make that both stronger and weaker than you might expect:</p>
+<ul>
+  <li><b>A match does not mean the meaning is the same.</b> Two files can be character-identical yet describe different things if they were both produced from the same wrong source. The comparator checks bytes, not truth.</li>
+  <li><b>A match says nothing about who wrote the text.</b> This is a diff tool, not an authorship tool. There is no fingerprinting, no metadata, and no attempt to guess the author.</li>
+  <li><b>Character-identical is stricter than visual-identical.</b> Curly quotes vs straight quotes, an <code>é</code> stored as one character vs two (<code>e</code> + combining accent), non-breaking spaces, soft hyphens — these look the same on screen but are different code points. Text copied out of a PDF is the classic source of this kind of difference, and this page calls it out when it detects it (see the confusable-character diagnostic below).</li>
+  <li><b>The word-level highlight is a heuristic, not a guarantee.</b> It is a best-effort refinement of a line-level result. There is no single universally correct answer to &ldquo;which words within a changed line changed&rdquo;, so treat the highlight as guidance.</li>
+  <li><b>It does not detect the reason for a change.</b> The tool shows you <i>that</i> and <i>where</i> two texts differ. It cannot tell you whether the difference is a bug, an intentional edit, or a conversion artifact — you still have to read the lines.</li>
+</ul>
+
+<h2>Notes on how it works</h2>
+<h3>Line-level vs word-level — and which one to trust</h3>
+<p>The comparison runs in two passes. First the two texts are split into lines and compared with the Myers O(ND) algorithm, which finds the smallest possible set of line insertions and deletions that turns the original into the changed text. Each changed line is then refined word-by-word (whitespace keeps its token identity, so <code>foo bar</code> is two words plus a separator, not one blob). For <b>code</b>, trust the line-level result: a class rename inside a &ldquo;changed&rdquo; line is usually the real change, and word-level refinement just helps you find it fast. For <b>prose</b>, the reverse is often true — a reflowed paragraph changes every line while the words are untouched, and word-level shows you that nothing meaningful happened. That disagreement is not a bug; it is the two levels answering two different questions: <i>where did the structure change</i> and <i>which words changed</i>.</p>
+<h3>Why &ldquo;ignore case&rdquo; and &ldquo;ignore whitespace&rdquo; are two separate switches</h3>
+<p>They are different lies, and each one hides a different class of real change. <b>Ignore case</b> compares <code>abc</code> and <code>ABC</code> as equal — convenient for prose, dangerous for code, where a single case change (<code>User</code> renamed to <code>user</code>) can be the entire point of the diff. <b>Ignore whitespace</b> strips run-of whitespace before comparing — convenient when reformatting touched alignment, dangerous when whitespace is significant, as it is in Python and YAML. The two switches are independent on purpose: turning one on never silently turns on the other, and the page tells you when a switch is hiding a change.</p>
+<h3>Where the invisible differences live</h3>
+<p>Line endings are real characters — a <code>CRLF</code> file and an <code>LF</code> file differ on every single line even though they display identically. The diagnostic strip counts the newline styles in each input, so if a reformat flipped them you see one summary line instead of a wall of red. <b>This is the one check that needs the file rather than a paste:</b> a text box cannot carry a carriage return, because the browser normalises newlines in an editable element, so text pasted out of a CRLF file arrives as plain <code>LF</code> and the difference is gone before the tool ever sees it. Press <b>Load file&hellip;</b> on a side and the bytes are read as they are on disk, which is what makes the line-ending count meaningful instead of decorative. The same strip reports trailing whitespace and tab usage: trailing spaces are invisible in most editors, and a tab/space swap breaks a compare with nothing on screen to point at. Finally, the confusable-character check counts the code points most likely to arrive differently after a copy-paste through a PDF or a web page (non-breaking spaces, curly quotes, dashes, soft hyphens, combining accents) and tells you when their counts differ between the two inputs, so a difference you can see is also a difference you can explain.</p>
+
+</main>
+</div>
+
+<footer class="foot">
+  <div class="wrap">
+    <p style="margin:0 0 8px">IFetchora &middot; a small browser tool that solves one problem. No account, no upload, no tracking, no network requests.</p>
+    <p style="margin:0">Download and source: see <code>https://github.com/aaqunar-a11y/ifetchora-tools</code> &middot; Version 1.0.0 &middot; MIT licensed</p>
+  </div>
+</footer>
+
+<script>
+/* ============================================================================
+   TEXT DIFF CHECKER v1.0.0 — self-contained, no dependencies, no network.
+   Core: Myers O(ND) line diff + word-level refinement + line-ending / trailing-
+   whitespace / tab / confusable-character forensics.
+   The core below (up to the "UI" marker) is pure and is cross-checked against
+   an independent LCS reference in the test suite.
+   ========================================================================= */
+"use strict";
+
+/* ---------------------------- line splitting ----------------------------- */
+function splitLines(s){
+  if(!s)return [];
+  return String(s).split(/\r\n|\r|\n/);
+}
+
+/* ----------------------------- Myers diff -------------------------------- */
+/* Returns an edit script over arrays a and b using equivalence eq(x,y).
+   ops: [{t:'eq',i,j},{t:'del',i,j:-1},{t:'ins',i:-1,j}] in left-to-right order.
+   The script is minimal: number of del+ins is D, and the longest common
+   subsequence implied by the eq ops has maximal length. */
+function myers(a,b,eq){
+  var N=a.length,M=b.length,ops=[];
+  if(N===0&&M===0)return ops;
+  if(N===0){for(var j0=0;j0<M;j0++)ops.push({t:'ins',i:-1,j:j0});return ops;}
+  if(M===0){for(var i0=0;i0<N;i0++)ops.push({t:'del',i:i0,j:-1});return ops;}
+  var max=N+M,O=max;
+  var V=new Int32Array(2*max+3),trace=[],dEnd=-1;
+  V[O+1]=0;
+  outer:
+  for(var d=0;d<=max;d++){
+    trace.push(V.slice());
+    for(var k=-d;k<=d;k+=2){
+      var x,y;
+      if(k===-d||(k!==d&&V[O+k-1]<V[O+k+1])){x=V[O+k+1];}
+      else{x=V[O+k-1]+1;}
+      y=x-k;
+      while(x<N&&y<M&&eq(a[x],b[y])){x++;y++;}
+      V[O+k]=x;
+      if(x>=N&&y>=M){dEnd=d;break outer;}
+    }
+  }
+  var x2=N,y2=M;
+  for(var dd=dEnd;dd>0;dd--){
+    /* NOTE: trace[i] holds V AFTER iteration i-1 (pushed at the top of the
+       d-loop), so the predecessor state for step dd is trace[dd], NOT
+       trace[dd-1] — using the wrong frame mis-selects the previous diagonal
+       and emits 'eq' ops that point at unequal cells. */
+    var prev=trace[dd],k2=x2-y2,pk,px,py;
+    if(k2===-dd||(k2!==dd&&prev[O+k2-1]<prev[O+k2+1])){pk=k2+1;}
+    else{pk=k2-1;}
+    px=prev[O+pk];py=px-pk;
+    while(x2>px&&y2>py){ops.push({t:'eq',i:x2-1,j:y2-1});x2--;y2--;}
+    if(x2===px){ops.push({t:'ins',i:-1,j:y2-1});y2--;}
+    else{ops.push({t:'del',i:x2-1,j:-1});x2--;}
+  }
+  while(x2>0&&y2>0&&eq(a[x2-1],b[y2-1])){ops.push({t:'eq',i:x2-1,j:y2-1});x2--;y2--;}
+  while(x2>0){ops.push({t:'del',i:x2-1,j:-1});x2--;}
+  while(y2>0){ops.push({t:'ins',i:-1,j:y2-1});y2--;}
+  ops.reverse();
+  return ops;
+}
+
+/* --------------------------- equivalence options ------------------------- */
+function makeEq(opts){
+  opts=opts||{};
+  if(opts.ignoreCase||opts.ignoreWhitespace){
+    return function(x,y){
+      var a=opts.ignoreCase?String(x).toLowerCase():String(x);
+      var b=opts.ignoreCase?String(y).toLowerCase():String(y);
+      if(opts.ignoreWhitespace){a=a.replace(/\s+/g,"");b=b.replace(/\s+/g,"");}
+      return a===b;
+    };
+  }
+  return function(x,y){return x===y;};
+}
+
+/* ------------------------------ line diff -------------------------------- */
+function diffLines(textA,textB,opts){
+  opts=opts||{};
+  var aLines=splitLines(textA),bLines=splitLines(textB);
+  var ops=myers(aLines,bLines,makeEq(opts));
+  return{aLines:aLines,bLines:bLines,ops:ops};
+}
+
+/* ------------------------------- word diff ------------------------------- */
+function tokenizeWords(line){
+  var out=[],re=/(\s+)/g,last=0,m;
+  while((m=re.exec(line))){
+    if(m.index>last)out.push({s:line.slice(last,m.index),ws:false});
+    out.push({s:m[1],ws:true});
+    last=re.lastIndex;
+  }
+  if(last<line.length)out.push({s:line.slice(last),ws:false});
+  if(!out.length)out.push({s:"",ws:false});
+  return out;
+}
+function diffWords(lineA,lineB,opts){
+  opts=opts||{};
+  var ta=tokenizeWords(lineA),tb=tokenizeWords(lineB);
+  var eq=function(x,y){
+    if(opts.ignoreWhitespace&&x.ws&&y.ws)return true;
+    var a=opts.ignoreCase?x.s.toLowerCase():x.s;
+    var b=opts.ignoreCase?y.s.toLowerCase():y.s;
+    if(opts.ignoreWhitespace){a=a.replace(/\s+/g,"");b=b.replace(/\s+/g,"");}
+    return a===b;
+  };
+  return{ops:myers(ta,tb,eq),ta:ta,tb:tb};
+}
+/* Build highlight fragments for one side given word ops.
+   side 'a' (original): keep + deleted tokens; side 'b' (changed): keep + inserted. */
+function fragsFromWordOps(res,side){
+  var frags=[];
+  for(var i=0;i<res.ops.length;i++){
+    var o=res.ops[i];
+    if(side==='a'){
+      if(o.t==='eq'||o.t==='del')frags.push({t:o.t==='eq'?'keep':'chg',s:res.ta[o.i].s});
+    }else{
+      if(o.t==='eq'||o.t==='ins')frags.push({t:o.t==='eq'?'keep':'chg',s:res.tb[o.j].s});
+    }
+  }
+  return frags;
+}
+
+/* ------------------------------ forensics -------------------------------- */
+function metaInfo(text){
+  var s=String(text||""),crlf=0,lf=0,cr=0,tabs=0,i=0;
+  while(i<s.length){
+    var c=s.charCodeAt(i);
+    if(c===13){
+      if(s.charCodeAt(i+1)===10){crlf++;i+=2;}
+      else{cr++;i++;}
+    }else if(c===10){lf++;i++;}
+    else if(c===9){tabs++;i++;}
+    else{i++;}
+  }
+  var lines=s.split(/\r\n|\r|\n/),trailing=0;
+  for(var j=0;j<lines.length;j++)if(/[ \t]+$/.test(lines[j]))trailing++;
+  return{crlf:crlf,lf:lf,cr:cr,tabs:tabs,trailingWsLines:trailing,lineCount:lines.length};
+}
+var CONFUSABLES=[
+  ["non-breaking space (U+00A0)","\u00a0"],
+  ["narrow no-break space (U+202F)","\u202f"],
+  ["en space (U+2002)","\u2002"],
+  ["em space (U+2003)","\u2003"],
+  ["thin space (U+2009)","\u2009"],
+  ["zero-width space (U+200B)","\u200b"],
+  ["BOM / zero-width no-break space (U+FEFF)","\ufeff"],
+  ["curly double quotes (U+201C/201D)","\u201c\u201d"],
+  ["curly single quotes (U+2018/2019)","\u2018\u2019"],
+  ["en dash (U+2013)","\u2013"],
+  ["em dash (U+2014)","\u2014"],
+  ["soft hyphen (U+00AD)","\u00ad"],
+  ["no-break hyphen (U+2011)","\u2011"],
+  ["middle dot (U+00B7)","\u00b7"],
+  ["right-to-left mark (U+200F)","\u200f"],
+  ["left-to-right mark (U+200E)","\u200e"],
+  ["combining acute accent (U+0301)","\u0301"],
+  ["combining diaeresis (U+0308)","\u0308"],
+  ["combining cedilla (U+0327)","\u0327"],
+];
+function countConfusables(text){
+  var s=String(text||""),out=[];
+  for(var i=0;i<CONFUSABLES.length;i++){
+    var n=0;
+    for(var j=0;j<CONFUSABLES[i][1].length;j++){
+      var ch=CONFUSABLES[i][1].charAt(j);
+      for(var k=0;k<s.length;k++)if(s.charAt(k)===ch)n++;
+    }
+    if(n>0)out.push({name:CONFUSABLES[i][0],count:n});
+  }
+  return out;
+}
+
+/* --------------------------------- UI ----------------------------------- */
+var $=function(id){return document.getElementById(id);};
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function eolDesc(m){return "CRLF "+m.crlf+" / LF "+m.lf+" / CR "+m.cr;}
+
+/* ------------------------- raw-text side channel ------------------------- */
+/* A text box cannot carry a carriage return: the browser normalises newlines in
+   an editable element, so a CRLF file pasted in arrives as LF and the
+   line-ending check would have nothing left to look at. Loading the file keeps
+   the bytes exactly as they are on disk in RAW[], and that is what the
+   forensics and the comparison read. Editing a box by hand drops the loaded
+   copy for that side and falls back to the text in the box. */
+var RAW={a:null,b:null},MAX_FILE=2*1024*1024;
+function textOf(side){
+  if(RAW[side]!==null)return RAW[side];
+  return side==="a"?$("ta").value:$("tb").value;
+}
+function loadSide(side,file){
+  var box=side==="a"?$("ta"):$("tb"),note=side==="a"?$("fileNoteA"):$("fileNoteB");
+  if(!file)return;
+  if(file.size>MAX_FILE){
+    $("status").textContent="that file is too large to read here ("+(MAX_FILE/1048576)+
+      " MB limit) — narrow it down first";
+    return;
+  }
+  var fr=new FileReader();
+  fr.onload=function(){
+    RAW[side]=String(fr.result);
+    box.value=RAW[side];
+    note.textContent=file.name+" ("+file.size+" bytes from disk)";
+    render();
+  };
+  fr.onerror=function(){$("status").textContent="that file could not be read";};
+  fr.readAsText(file);
+}
+
+function render(){
+  var ta=textOf("a"),tb=textOf("b");
+  var opts={ignoreCase:$("igCase").checked,ignoreWhitespace:$("igWs").checked};
+  var v=$("verdict"),dl=$("diag"),dw=$("diffwrap"),dd=$("diff"),sm=$("sums");
+  v.style.display="none";dl.style.display="none";dl.innerHTML="";dw.style.display="none";
+  $("status").textContent="";
+
+  var diags=[];
+
+  if(!ta&&!tb){
+    v.className="verdict warn";v.style.display="block";
+    v.innerHTML="<b>Both inputs are empty</b>Paste something into step 1 and step 2, then press Compare.";
+    return;
+  }
+
+  /* Pathological-input guard: the Myers pass is O((N+M)*D) in memory AND time.
+     Two huge texts that barely overlap would freeze the tab for minutes to
+     build a wall of red. One cheap pre-pass (string-set overlap) decides. */
+  var _aL=splitLines(ta),_bL=splitLines(tb);
+  if(_aL.length+_bL.length>20000){
+    var _set=Object.create(null),_hit=0,mn=_aL.length<_bL.length?_aL.length:_bL.length;
+    for(var _i5=0;_i5<_aL.length;_i5++)_set[_aL[_i5]]=1;
+    for(var _j5=0;_j5<_bL.length;_j5++)if(_set[_bL[_j5]]!==undefined)_hit++;
+    if(_hit<mn*0.05){
+      v.className="verdict warn";v.style.display="block";
+      v.innerHTML="<b>Too large to usefully diff</b>These two inputs are very large "+
+        "("+(_aL.length+_bL.length)+" lines total) and share almost nothing "+
+        "in common ("+_hit+" matching lines on the smaller side). Nearly every row "+
+        "would be red, and building that wall would freeze the tab. The answer is "+
+        "already clear: the texts are essentially different. Narrow the inputs to "+
+        "the region you actually want to compare.";
+      return;
+    }
+  }
+
+  var res=diffLines(ta,tb,opts);
+  var dels=0,inss=0,eqs=0;
+  for(var i=0;i<res.ops.length;i++){
+    var o=res.ops[i];
+    if(o.t==='del')dels++;else if(o.t==='ins')inss++;else eqs++;
+  }
+
+  /* -------------------------------- forensics --------------------------- */
+  var ma=metaInfo(ta),mb=metaInfo(tb);
+  var lineEndStyleA=(ma.crlf>0?"CRLF":"")+(ma.lf>0?" LF":"")+(ma.cr>0?" lone CR":"");
+  var lineEndStyleB=(mb.crlf>0?"CRLF":"")+(mb.lf>0?" LF":"")+(mb.cr>0?" lone CR":"");
+  if(lineEndStyleA!==lineEndStyleB&&ma.lineCount>0&&mb.lineCount>0){
+    diags.push(["hit","The line-ending style differs between the two inputs",
+      "Original uses <b>"+(lineEndStyleA||"none")+"</b>; changed uses <b>"+(lineEndStyleB||"none")+"</b>. "+
+      "A reformat that flipped CRLF to LF makes every single line look changed even though the visible text is identical. "+
+      "Line counts: original "+ma.lineCount+", changed "+mb.lineCount+"."]);
+  }
+  var wsTotal=ma.trailingWsLines+mb.trailingWsLines;
+  if(wsTotal>0){
+    diags.push(["hit","Trailing whitespace is present",
+      "Original has <b>"+ma.trailingWsLines+"</b> line(s) ending in spaces or tabs; changed has <b>"+mb.trailingWsLines+"</b>. "+
+      "Trailing spaces are invisible in most editors and break an exact compare. "+
+      (opts.ignoreWhitespace?"Ignoring whitespace hides them from the diff — remember it also hides indentation changes.":"")]);
+  }
+  if(ma.tabs!==mb.tabs){
+    diags.push(["hit","Tab usage differs between the two inputs",
+      "Original uses <b>"+ma.tabs+"</b> tab character(s); changed uses <b>"+mb.tabs+"</b>. "+
+      "A tab/space swap looks identical on screen and shows nothing in the text itself — only the byte value changed."]);
+  }
+  var caMap={},cbMap={};
+  countConfusables(ta).forEach(function(x){caMap[x.name]=x.count;});
+  countConfusables(tb).forEach(function(x){cbMap[x.name]=x.count;});
+  var confDifferences=[];
+  Object.keys(caMap).concat(Object.keys(cbMap)).forEach(function(name){
+    var na=caMap[name]||0,nb=cbMap[name]||0;
+    if(na!==nb)confDifferences.push(name+" ("+na+" vs "+nb+")");
+  });
+  if(confDifferences.length){
+    diags.push(["hit","Confusable characters differ between the two inputs",
+      "These look the same on screen but are different code points, so they count as real differences: "+
+      esc(confDifferences.join("; "))+". This is the classic signature of text copied out of a PDF or a web page; "+
+      "retyping one side, or running the text through a normaliser, removes the noise."]);
+  }
+  if(opts.ignoreCase){
+    diags.push(["info","Ignore case is on",
+      "It treats <code>abc</code> and <code>ABC</code> as equal. That is convenient for prose but it can hide the entire point of a diff in code, where renaming <code>User</code> to <code>user</code> is a real change."]);
+  }
+  if(opts.ignoreWhitespace){
+    diags.push(["info","Ignore whitespace is on",
+      "It strips run-of whitespace before comparing. Alignment-only reformats disappear, but indentation changes that matter (Python, YAML, shell) are hidden too — see the trailing-whitespace line above."]);
+  }
+
+  /* -------------------------------- rendering --------------------------- */
+  var html="",lnA=1,lnB=1;
+  for(var r=0;r<res.ops.length;r++){
+    var op=res.ops[r];
+    if(op.t==='eq'){
+      html+='<div class="row eq"><div class="ln">'+lnA+' '+lnB+'</div><div class="tx">'+
+        esc(res.aLines[op.i])+'</div></div>';
+      lnA++;lnB++;
+    }else{
+      /* gather the whole run of deletions/insertions between two equal ops */
+      var run=[],k=r;
+      while(k<res.ops.length&&(res.ops[k].t==='del'||res.ops[k].t==='ins')){run.push(res.ops[k]);k++;}
+      r=k-1;
+      var dL=0,iL=0;
+      for(var u=0;u<run.length;u++){if(run[u].t==='del')dL++;else iL++;}
+      if(dL===1&&iL===1&&run.length===2&&run[0].t!==run[1].t){
+        /* a single changed line: refine word by word */
+        var wres=diffWords(res.aLines[run[0].t==='del'?run[0].i:run[1].i],
+                           res.bLines[run[0].t==='ins'?run[0].j:run[1].j],opts);
+        var fa=fragsFromWordOps(wres,'a'),fb=fragsFromWordOps(wres,'b');
+        var ha="",hb2="";
+        for(var f=0;f<fa.length;f++)ha+=fa[f].t==='chg'?'<span class="chgdel">'+esc(fa[f].s)+'</span>':esc(fa[f].s);
+        for(var g=0;g<fb.length;g++)hb2+=fb[g].t==='chg'?'<span class="chgins">'+esc(fb[g].s)+'</span>':esc(fb[g].s);
+        var ia=run[0].t==='del'?run[0].i:run[1].i,ib=run[0].t==='ins'?run[0].j:run[1].j;
+        html+='<div class="row del"><div class="ln">'+ia+1+'</div><div class="tx">'+ha+'</div></div>';
+        html+='<div class="row ins"><div class="ln">'+(ib+1)+'</div><div class="tx">'+hb2+'</div></div>';
+        lnA++;lnB++;
+      }else{
+        for(var u2=0;u2<run.length;u2++){
+          var op2=run[u2];
+          if(op2.t==='del'){
+            html+='<div class="row del"><div class="ln">'+(op2.i+1)+'</div><div class="tx">'+esc(res.aLines[op2.i])+'</div></div>';
+            lnA++;
+          }else{
+            html+='<div class="row ins"><div class="ln">'+(op2.j+1)+'</div><div class="tx">'+esc(res.bLines[op2.j])+'</div></div>';
+            lnB++;
+          }
+        }
+      }
+    }
+  }
+  if(!html)html='<div class="row eq"><div class="ln">&nbsp;</div><div class="tx">(empty file)</div></div>';
+
+  /* --------------------------------- verdict ----------------------------- */
+  v.style.display="block";
+  if(dels===0&&inss===0){
+    v.className="verdict ok";
+    v.innerHTML="<b>IDENTICAL — no differences found</b>The two inputs are character-for-character the same"+
+      (opts.ignoreCase||opts.ignoreWhitespace?" under the current ignore settings — turn them off to see the strictly exact compare":"")+".";
+  }else{
+    v.className="verdict bad";
+    v.innerHTML="<b>DIFFERENT — "+dels+" line(s) removed, "+inss+" line(s) added</b>"+
+      (eqs>0?eqs+" line(s) matched.":"No line matched at all — check the line-ending and whitespace diagnostics; a reformat or a PDF copy can make everything look changed.")+
+      " Read the diagnostics below before assuming the content was edited.";
+  }
+
+  sm.innerHTML='<span>'+eqs+' equal line(s)</span>'+
+    (dels?'<span class="srm">&minus;'+dels+' removed</span>':'')+
+    (inss?'<span class="sadd">+'+inss+' added</span>':'');
+  dd.innerHTML=html;
+  dw.style.display="block";
+
+  if(diags.length){
+    dl.innerHTML=diags.map(function(d){
+      return '<li class="'+d[0]+'"><span class="h">'+d[1]+'</span>'+d[2]+'</li>';
+    }).join("");
+    dl.style.display="block";
+  }
+}
+
+/* ------------------------------- wiring --------------------------------- */
+$("go").addEventListener("click",render);
+$("swap").addEventListener("click",function(){
+  /* swap the boxes AND the disk bytes, otherwise the two sides cross over */
+  var a=$("ta").value,b=$("tb").value,ra=RAW.a,rb=RAW.b;
+  var na=$("fileNoteA").textContent,nb=$("fileNoteB").textContent;
+  $("ta").value=b;$("tb").value=a;
+  RAW.a=rb;RAW.b=ra;
+  $("fileNoteA").textContent=nb;$("fileNoteB").textContent=na;
+  render();
+});
+$("clear").addEventListener("click",function(){
+  $("ta").value="";$("tb").value="";
+  RAW.a=null;RAW.b=null;
+  $("fileNoteA").textContent="";$("fileNoteB").textContent="";
+  $("igCase").checked=false;$("igWs").checked=false;
+  $("verdict").style.display="none";$("diffwrap").style.display="none";
+  $("diag").style.display="none";$("diag").innerHTML="";$("status").textContent="";
+});
+$("fa").addEventListener("change",function(){
+  if(this.files&&this.files[0])loadSide("a",this.files[0]);
+  this.value="";
+});
+$("fb").addEventListener("change",function(){
+  if(this.files&&this.files[0])loadSide("b",this.files[0]);
+  this.value="";
+});
+$("ta").addEventListener("input",function(){RAW.a=null;$("fileNoteA").textContent="";});
+$("tb").addEventListener("input",function(){RAW.b=null;$("fileNoteB").textContent="";});
+["igCase","igWs"].forEach(function(id){
+  $(id).addEventListener("change",function(){if($("ta").value||$("tb").value)render();});
+});
+</script>
+</body>
+</html>
