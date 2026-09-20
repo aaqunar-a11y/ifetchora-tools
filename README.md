@@ -8,8 +8,13 @@ Everything is MIT licensed.
 
 | Tool | What it solves | Size | Offline | Source | Use it |
 |---|---|---|---|---|---|
-| **File Hash Checker** | Check a downloaded file against the checksum its publisher published, and find out *why* the values differ when they do | 31624 bytes | yes | [source](https://github.com/aaqunar-a11y/ifetchora-tools/tree/file-hash-checker-v1.0.0/tools/file-hash-checker/) | [https://ifetchora.com/tools/file-hash-checker/](https://ifetchora.com/tools/file-hash-checker/) |
+| **File Hash Checker** | Check a downloaded file against the checksum its publisher published, and find out *why* the values differ when they do &mdash; SHA-512, SHA-384, SHA-256, SHA-1 and MD5, all computed in the page | 43407 bytes | yes | [source](https://github.com/aaqunar-a11y/ifetchora-tools/tree/file-hash-checker-v1.1.0/tools/file-hash-checker/) | [https://ifetchora.com/tools/file-hash-checker/](https://ifetchora.com/tools/file-hash-checker/) |
 | **Text Diff Checker** | Compare two blocks of text and see exactly which lines and words differ, including the differences that are invisible on screen &mdash; trailing whitespace, tab/space swaps, confusable characters, and CRLF vs LF | 31039 bytes | yes | [source](https://github.com/aaqunar-a11y/ifetchora-tools/tree/text-diff-checker-v1.0.0/tools/text-diff-checker/) | [https://ifetchora.com/tools/text-diff-checker/](https://ifetchora.com/tools/text-diff-checker/) |
+
+Each tool also has a short explanation of the problem it solves and a how-to page for
+the manual route:
+
+* **File Hash Checker** &mdash; [why a download that reports success is not a file you can trust](https://ifetchora.com/problems/verify-download-authenticity/) &middot; [how to verify a SHA256 checksum on Windows, macOS, Linux or in the browser](https://ifetchora.com/guides/how-to-verify-sha256-checksums/)
 
 ## Why these tools look the way they do
 
